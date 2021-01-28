@@ -70,7 +70,7 @@ func getMSSQLInstances() mssqlInstancesType {
 type mssqlCollectorsMap map[string]mssqlCollectorFunc
 
 func mssqlAvailableClassCollectors() string {
-	return "accessmethods,availreplica,bufman,databases,dbreplica,genstats,locks,memmgr,sqlstats,sqlerrors,transactions"
+	return "accessmethods,availreplica,bufman,databases,dbreplica,genstats,locks,memmgr,sqlstats,sqlerrors,transactions,waitstats"
 }
 
 func (c *MSSQLCollector) getMSSQLCollectors() mssqlCollectorsMap {
@@ -121,6 +121,8 @@ func mssqlGetPerfObjectName(sqlInstance string, collector string) string {
 		suffix = "SQL Statistics"
 	case "transactions":
 		suffix = "Transactions"
+	case "waitstats":
+		suffix = "Wait Statistics"
 	}
 	return (prefix + suffix)
 }
@@ -381,6 +383,19 @@ type MSSQLCollector struct {
 	TransactionsVersionStoreUnits                *prometheus.Desc
 	TransactionsVersionStoreCreationUnits        *prometheus.Desc
 	TransactionsVersionStoreTruncationUnits      *prometheus.Desc
+
+	// Win32_PerfRawData_{instance}_SQLServerWaitStatistics
+	WaitStatisticsLockWaits                     *prometheus.Desc
+	WaitStatisticsLogBufferWaits                *prometheus.Desc
+	WaitStatisticsLogWriteWaits                 *prometheus.Desc
+	WaitStatisticsMemoryGrantQueueWaits         *prometheus.Desc
+	WaitStatisticsNetworkIOWaits                *prometheus.Desc
+	WaitStatisticsNonPageLatchWaits             *prometheus.Desc
+	WaitStatisticsPageIOLatchWaits              *prometheus.Desc
+	WaitStatisticsPageLatchWaits                *prometheus.Desc
+	WaitStatisticsTransactionOwnershipWaits     *prometheus.Desc
+	WaitStatisticsWaitForTheWorker              *prometheus.Desc
+	WaitStatisticsWorkspaceSynchronizationWaits *prometheus.Desc
 
 	mssqlInstances             mssqlInstancesType
 	mssqlCollectors            mssqlCollectorsMap
@@ -1785,6 +1800,74 @@ func NewMSSQLCollector() (Collector, error) {
 		TransactionsVersionStoreTruncationUnits: prometheus.NewDesc(
 			prometheus.BuildFQName(Namespace, subsystem, "transactions_version_store_truncation_units"),
 			"(Transactions.VersionStoreUnitTruncation)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+
+		// Win32_PerfRawData_{instance}_SQLServerWaitStatistics
+		WaitStatisticsLockWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_lock_waits_total"),
+			"(WaitStatistics.LockWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsLogBufferWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_log_buffer_waits_total"),
+			"(WaitStatistics.LogBufferWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsLogWriteWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_log_write_waits_total"),
+			"(WaitStatistics.LogWriteWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsMemoryGrantQueueWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_memory_grant_queue_waits_total"),
+			"(WaitStatistics.MemoryGrantQueueWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsNetworkIOWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_network_io_waits_total"),
+			"(WaitStatistics.NetworkIOWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsNonPageLatchWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_non_page_latch_waits_total"),
+			"(WaitStatistics.NonPageLatchWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsPageIOLatchWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_page_io_latch_waits_total"),
+			"(WaitStatistics.PageIOLatchWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsPageLatchWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_page_latch_waits_total"),
+			"(WaitStatistics.PageLatchWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsTransactionOwnershipWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_transaction_ownership_waits_total"),
+			"(WaitStatistics.TransactionOwnershipWaits)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsWaitForTheWorker: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_worker_waits_total"),
+			"(WaitStatistics.WaitForTheWorker)",
+			[]string{"mssql_instance"},
+			nil,
+		),
+		WaitStatisticsWorkspaceSynchronizationWaits: prometheus.NewDesc(
+			prometheus.BuildFQName(Namespace, subsystem, "waitstats_workspace_synchronization_waits_total"),
+			"(WaitStatistics.WorkspaceSynchronizationWaits)",
 			[]string{"mssql_instance"},
 			nil,
 		),
@@ -3880,6 +3963,113 @@ func (c *MSSQLCollector) collectTransactions(ctx *ScrapeContext, ch chan<- prome
 			v.VersionStoreunittruncation,
 			sqlInstance,
 		)
+	}
+
+	return nil, nil
+}
+
+type mssqlWaitStats struct {
+	LockWaits                     float64 `perflib:"Lock Waits"`
+	LogBufferWaits                float64 `perflib:"Log buffer waits"`
+	LogWriteWaits                 float64 `perflib:"Log write waits"`
+	MemoryGrantQueueWaits         float64 `perflib:"Memory grant queue waits"`
+	NetworkIOWaits                float64 `perflib:"Network IO waits"`
+	NonPageLatchWaits             float64 `perflib:"Non-Page latch waits"`
+	PageIOLatchWaits              float64 `perflib:"Page IO latch waits"`
+	PageLatchWaits                float64 `perflib:"Page latch waits"`
+	TransactionOwnershipWaits     float64 `perflib:"Transaction ownership waits"`
+	WaitForTheWorker              float64 `perflib:"Wait for the worker"`
+	WorkspaceSynchronizationWaits float64 `perflib:"Workspace synchronization waits"`
+}
+
+// Win32_PerfRawData_MSSQLSERVER_SQLServerWaitStatistics
+// - https://docs.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-wait-statistics-object
+func (c *MSSQLCollector) collectWaitStats(ctx *ScrapeContext, ch chan<- prometheus.Metric, sqlInstance string) (*prometheus.Desc, error) {
+	var dst []mssqlWaitStats
+	log.Debugf("mssql_waitstats collector iterating sql instance %s.", sqlInstance)
+
+	if err := unmarshalObject(ctx.perfObjects[mssqlGetPerfObjectName(sqlInstance, "waitstats")], &dst); err != nil {
+		return nil, err
+	}
+
+	for _, v := range dst {
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsLockWaits,
+			prometheus.CounterValue,
+			v.LockWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsLogBufferWaits,
+			prometheus.CounterValue,
+			v.LogBufferWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsLogWriteWaits,
+			prometheus.CounterValue,
+			v.LogWriteWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsMemoryGrantQueueWaits,
+			prometheus.CounterValue,
+			v.MemoryGrantQueueWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsNetworkIOWaits,
+			prometheus.CounterValue,
+			v.NetworkIOWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsNonPageLatchWaits,
+			prometheus.CounterValue,
+			v.NonPageLatchWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsPageIOLatchWaits,
+			prometheus.CounterValue,
+			v.PageIOLatchWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsPageLatchWaits,
+			prometheus.CounterValue,
+			v.PageLatchWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsTransactionOwnershipWaits,
+			prometheus.CounterValue,
+			v.TransactionOwnershipWaits,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsWaitForTheWorker,
+			prometheus.CounterValue,
+			v.WaitForTheWorker,
+			sqlInstance,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			c.WaitStatisticsWorkspaceSynchronizationWaits,
+			prometheus.CounterValue,
+			v.WorkspaceSynchronizationWaits,
+			sqlInstance,
+		)
+
 	}
 
 	return nil, nil
