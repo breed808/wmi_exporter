@@ -3,12 +3,10 @@
 package collector
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -173,8 +171,7 @@ type netclrCollector struct {
 	processWhitelistPattern *regexp.Regexp
 	processBlacklistPattern *regexp.Regexp
 
-	netclrCollectors            netclrCollectorsMap
-	netclrChildCollectorFailure int
+	netclrCollectors netclrCollectorsMap
 }
 
 func newNETCLRCollector() (Collector, error) {
@@ -537,9 +534,7 @@ func newNETCLRCollector() (Collector, error) {
 	return netclrCollector, nil
 }
 
-func (c *netclrCollector) execute(ctx *ScrapeContext, name string, fn netclrCollectorFunc, ch chan<- prometheus.Metric, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (c *netclrCollector) execute(ctx *ScrapeContext, name string, fn netclrCollectorFunc, ch chan<- prometheus.Metric) error {
 	begin := time.Now()
 	_, err := fn(ctx, ch)
 	duration := time.Since(begin)
@@ -548,9 +543,7 @@ func (c *netclrCollector) execute(ctx *ScrapeContext, name string, fn netclrColl
 	if err != nil {
 		log.Errorf("netframework_clr sub-collector %s failed after %fs: %s", name, duration.Seconds(), err)
 		success = 0
-		c.netclrChildCollectorFailure++
 	} else {
-		log.Debugf("netframework_clr sub-collector %s succeeded after %fs.", name, duration.Seconds())
 		success = 1
 	}
 	ch <- prometheus.MustNewConstMetric(
@@ -565,24 +558,17 @@ func (c *netclrCollector) execute(ctx *ScrapeContext, name string, fn netclrColl
 		success,
 		name,
 	)
+	return err
 }
 
 func (c *netclrCollector) Collect(ctx *ScrapeContext, ch chan<- prometheus.Metric) error {
-	wg := sync.WaitGroup{}
-
-	c.netclrChildCollectorFailure = 0
-	enabled := netclrExpandEnabledCollectors(*netclrEnabledCollectors)
-	for _, name := range enabled {
+	for _, name := range netclrExpandEnabledCollectors(*netclrEnabledCollectors) {
 		function := c.netclrCollectors[name]
 
-		wg.Add(1)
-		go c.execute(ctx, name, function, ch, &wg)
-	}
-	wg.Wait()
-
-	// This should return an error if any collector encountered an error.
-	if c.netclrChildCollectorFailure > 0 {
-		return errors.New("at least one child collector failed")
+		err := c.execute(ctx, name, function, ch)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
