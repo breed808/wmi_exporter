@@ -598,6 +598,7 @@ func (c *netclrCollector) netclrMapProcessName(name string, nameCounts map[strin
 type netclrExceptions struct {
 	Name string
 
+	PID                     string  `perflib:"Process ID"`
 	NumberofExcepsThrown    float64 `perflib:"# of Exceps Thrown"`
 	NumberofFiltersPersec   float64 `perflib:"# of Filters / sec"`
 	NumberofFinallysPersec  float64 `perflib:"# of Finallys / sec"`
@@ -612,39 +613,33 @@ func (c *netclrCollector) collectExceptions(ctx *ScrapeContext, ch chan<- promet
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
-
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofExcepsThrown,
 			prometheus.CounterValue,
 			process.NumberofExcepsThrown,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofFilters,
 			prometheus.CounterValue,
 			process.NumberofFiltersPersec,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofFinallys,
 			prometheus.CounterValue,
 			process.NumberofFinallysPersec,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.ThrowToCatchDepth,
 			prometheus.CounterValue,
 			process.ThrowToCatchDepthPersec,
-			name,
+			process.PID,
 		)
 	}
 
@@ -654,6 +649,7 @@ func (c *netclrCollector) collectExceptions(ctx *ScrapeContext, ch chan<- promet
 type netclrInterop struct {
 	Name string
 
+	PID                 string  `perflib:"Process ID"`
 	NumberofCCWs        float64 `perflib:"# of CCWs"`
 	Numberofmarshalling float64 `perflib:"# of marshalling"`
 	NumberofStubs       float64 `perflib:"# of Stubs"`
@@ -667,32 +663,26 @@ func (c *netclrCollector) collectInterop(ctx *ScrapeContext, ch chan<- prometheu
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
-
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofCCWs,
 			prometheus.CounterValue,
 			process.NumberofCCWs,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.Numberofmarshalling,
 			prometheus.CounterValue,
 			process.Numberofmarshalling,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofStubs,
 			prometheus.CounterValue,
 			process.NumberofStubs,
-			name,
+			process.PID,
 		)
 	}
 
@@ -702,7 +692,8 @@ func (c *netclrCollector) collectInterop(ctx *ScrapeContext, ch chan<- prometheu
 type netclrJit struct {
 	Name string
 
-	Frequency_PerfTime         float64 `perflib:"Not Displayed_Base"`
+	PID                        string  `perflib:"Process ID"`
+	FrequencyPerfTime          float64 `perflib:"Not Displayed_Base"`
 	NumberofMethodsJitted      float64 `perflib:"# of Methods Jitted"`
 	PercentTimeinJit           float64 `perflib:"% Time in Jit"`
 	StandardJitFailures        float64 `perflib:"Standard Jit Failures"`
@@ -717,43 +708,37 @@ func (c *netclrCollector) collectJit(ctx *ScrapeContext, ch chan<- prometheus.Me
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
-
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofMethodsJitted,
 			prometheus.CounterValue,
 			process.NumberofMethodsJitted,
-			name,
+			process.PID,
 		)
 
 		timeInJit := 0.0
-		if process.Frequency_PerfTime != 0 {
-			timeInJit = process.PercentTimeinJit / process.Frequency_PerfTime
+		if process.FrequencyPerfTime != 0 {
+			timeInJit = process.PercentTimeinJit / process.FrequencyPerfTime
 		}
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeinJit,
 			prometheus.GaugeValue,
 			timeInJit,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.StandardJitFailures,
 			prometheus.GaugeValue,
 			process.StandardJitFailures,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalNumberofILBytesJitted,
 			prometheus.CounterValue,
 			process.TotalNumberofILBytesJitted,
-			name,
+			process.PID,
 		)
 	}
 
@@ -763,6 +748,7 @@ func (c *netclrCollector) collectJit(ctx *ScrapeContext, ch chan<- prometheus.Me
 type netclrLoading struct {
 	Name string
 
+	PID                       string  `perflib:"Process ID"`
 	BytesinLoaderHeap         float64 `perflib:"Bytes in Loader Heap"`
 	Currentappdomains         float64 `perflib:"Current appdomains"`
 	CurrentAssemblies         float64 `perflib:"Current Assemblies"`
@@ -782,74 +768,69 @@ func (c *netclrCollector) collectLoading(ctx *ScrapeContext, ch chan<- prometheu
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
 
 		ch <- prometheus.MustNewConstMetric(
 			c.BytesinLoaderHeap,
 			prometheus.GaugeValue,
 			process.BytesinLoaderHeap,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.Currentappdomains,
 			prometheus.GaugeValue,
 			process.Currentappdomains,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.CurrentAssemblies,
 			prometheus.GaugeValue,
 			process.CurrentAssemblies,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.CurrentClassesLoaded,
 			prometheus.GaugeValue,
 			process.CurrentClassesLoaded,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalAppdomains,
 			prometheus.CounterValue,
 			process.TotalAppdomains,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.Totalappdomainsunloaded,
 			prometheus.CounterValue,
 			process.Totalappdomainsunloaded,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalAssemblies,
 			prometheus.CounterValue,
 			process.TotalAssemblies,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalClassesLoaded,
 			prometheus.CounterValue,
 			process.TotalClassesLoaded,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalNumberofLoadFailures,
 			prometheus.CounterValue,
 			process.TotalNumberofLoadFailures,
-			name,
+			process.PID,
 		)
 	}
 
@@ -859,6 +840,7 @@ func (c *netclrCollector) collectLoading(ctx *ScrapeContext, ch chan<- prometheu
 type netclrLocksAndThreads struct {
 	Name string
 
+	PID                              string  `perflib:"Process ID"`
 	CurrentQueueLength               float64 `perflib:"Current Queue Length"`
 	NumberofcurrentlogicalThreads    float64 `perflib:"# of current logical Threads"`
 	NumberofcurrentphysicalThreads   float64 `perflib:"# of current physical Threads"`
@@ -876,60 +858,54 @@ func (c *netclrCollector) collectLocksAndThreads(ctx *ScrapeContext, ch chan<- p
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
-
 		ch <- prometheus.MustNewConstMetric(
 			c.CurrentQueueLength,
 			prometheus.GaugeValue,
 			process.CurrentQueueLength,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofcurrentlogicalThreads,
 			prometheus.GaugeValue,
 			process.NumberofcurrentlogicalThreads,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofcurrentphysicalThreads,
 			prometheus.GaugeValue,
 			process.NumberofcurrentphysicalThreads,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.Numberofcurrentrecognizedthreads,
 			prometheus.GaugeValue,
 			process.Numberofcurrentrecognizedthreads,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.Numberoftotalrecognizedthreads,
 			prometheus.CounterValue,
 			process.Numberoftotalrecognizedthreads,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.QueueLengthPeak,
 			prometheus.CounterValue,
 			process.QueueLengthPeak,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalNumberofContentions,
 			prometheus.CounterValue,
 			process.TotalNumberofContentions,
-			name,
+			process.PID,
 		)
 	}
 
@@ -939,9 +915,10 @@ func (c *netclrCollector) collectLocksAndThreads(ctx *ScrapeContext, ch chan<- p
 type netclrMemory struct {
 	Name string
 
+	PID                                string  `perflib:"Process ID"`
 	AllocatedBytesPersec               float64 `perflib:"Allocated Bytes/sec"`
 	FinalizationSurvivors              float64 `perflib:"Finalization Survivors"`
-	Frequency_PerfTime                 float64 `perflib:"Not Displayed_Base"`
+	FrequencyPerfTime                  float64 `perflib:"Not Displayed_Base"`
 	Gen0heapsize                       float64 `perflib:"Gen 0 heap size"`
 	Gen0PromotedBytesPerSec            float64 `perflib:"Gen 0 Promoted Bytes/Sec"`
 	Gen1heapsize                       float64 `perflib:"Gen 1 heap size"`
@@ -972,32 +949,26 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
-
 		ch <- prometheus.MustNewConstMetric(
 			c.AllocatedBytes,
 			prometheus.CounterValue,
 			process.AllocatedBytesPersec,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.FinalizationSurvivors,
 			prometheus.GaugeValue,
 			process.FinalizationSurvivors,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.HeapSize,
 			prometheus.GaugeValue,
 			process.Gen0heapsize,
-			name,
+			process.PID,
 			"Gen0",
 		)
 
@@ -1005,7 +976,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.PromotedBytes,
 			prometheus.GaugeValue,
 			process.Gen0PromotedBytesPerSec,
-			name,
+			process.PID,
 			"Gen0",
 		)
 
@@ -1013,7 +984,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.HeapSize,
 			prometheus.GaugeValue,
 			process.Gen1heapsize,
-			name,
+			process.PID,
 			"Gen1",
 		)
 
@@ -1021,7 +992,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.PromotedBytes,
 			prometheus.GaugeValue,
 			process.Gen1PromotedBytesPerSec,
-			name,
+			process.PID,
 			"Gen1",
 		)
 
@@ -1029,7 +1000,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.HeapSize,
 			prometheus.GaugeValue,
 			process.Gen2heapsize,
-			name,
+			process.PID,
 			"Gen2",
 		)
 
@@ -1037,7 +1008,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.HeapSize,
 			prometheus.GaugeValue,
 			process.LargeObjectHeapsize,
-			name,
+			process.PID,
 			"LOH",
 		)
 
@@ -1045,14 +1016,14 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.NumberGCHandles,
 			prometheus.GaugeValue,
 			process.NumberGCHandles,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberCollections,
 			prometheus.CounterValue,
 			process.NumberGen0Collections,
-			name,
+			process.PID,
 			"Gen0",
 		)
 
@@ -1060,7 +1031,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.NumberCollections,
 			prometheus.CounterValue,
 			process.NumberGen1Collections,
-			name,
+			process.PID,
 			"Gen1",
 		)
 
@@ -1068,7 +1039,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.NumberCollections,
 			prometheus.CounterValue,
 			process.NumberGen2Collections,
-			name,
+			process.PID,
 			"Gen2",
 		)
 
@@ -1076,46 +1047,46 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 			c.NumberInducedGC,
 			prometheus.CounterValue,
 			process.NumberInducedGC,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofPinnedObjects,
 			prometheus.GaugeValue,
 			process.NumberofPinnedObjects,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberofSinkBlocksinuse,
 			prometheus.GaugeValue,
 			process.NumberofSinkBlocksinuse,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberTotalCommittedBytes,
 			prometheus.GaugeValue,
 			process.NumberTotalcommittedBytes,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberTotalreservedBytes,
 			prometheus.GaugeValue,
 			process.NumberTotalreservedBytes,
-			name,
+			process.PID,
 		)
 
 		timeinGC := 0.0
-		if process.Frequency_PerfTime != 0 {
-			timeinGC = process.PercentTimeinGC / process.Frequency_PerfTime
+		if process.FrequencyPerfTime != 0 {
+			timeinGC = process.PercentTimeinGC / process.FrequencyPerfTime
 		}
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeinGC,
 			prometheus.GaugeValue,
 			timeinGC,
-			name,
+			process.PID,
 		)
 	}
 
@@ -1125,6 +1096,7 @@ func (c *netclrCollector) collectMemory(ctx *ScrapeContext, ch chan<- prometheus
 type netclrRemoting struct {
 	Name string
 
+	PID                            string  `perflib:"Process ID"`
 	Channels                       float64 `perflib:"Channels"`
 	ContextBoundClassesLoaded      float64 `perflib:"Context-Bound Classes Loaded"`
 	ContextBoundObjectsAllocPersec float64 `perflib:"Context-Bound Objects Alloc / sec"`
@@ -1142,53 +1114,47 @@ func (c *netclrCollector) collectRemoting(ctx *ScrapeContext, ch chan<- promethe
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
-
 		ch <- prometheus.MustNewConstMetric(
 			c.Channels,
 			prometheus.CounterValue,
 			process.Channels,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.ContextBoundClassesLoaded,
 			prometheus.GaugeValue,
 			process.ContextBoundClassesLoaded,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.ContextBoundObjects,
 			prometheus.CounterValue,
 			process.ContextBoundObjectsAllocPersec,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.ContextProxies,
 			prometheus.CounterValue,
 			process.ContextProxies,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.Contexts,
 			prometheus.GaugeValue,
 			process.Contexts,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalRemoteCalls,
 			prometheus.CounterValue,
 			process.TotalRemoteCalls,
-			name,
+			process.PID,
 		)
 	}
 
@@ -1198,7 +1164,8 @@ func (c *netclrCollector) collectRemoting(ctx *ScrapeContext, ch chan<- promethe
 type netclrSecurity struct {
 	Name string
 
-	Frequency_PerfTime    float64 `perflib:"Not Displayed_Base"`
+	PID                   string  `perflib:"Process ID"`
+	FrequencyPerfTime     float64 `perflib:"Not Displayed_Base"`
 	NumberLinkTimeChecks  float64 `perflib:"# Link Time Checks"`
 	PercentTimeinRTchecks float64 `perflib:"% Time in RT checks"`
 	StackWalkDepth        float64 `perflib:"Stack Walk Depth"`
@@ -1213,43 +1180,37 @@ func (c *netclrCollector) collectSecurity(ctx *ScrapeContext, ch chan<- promethe
 		return nil, err
 	}
 
-	names := make(map[string]int, len(dst))
 	for _, process := range dst {
-		name, keep := c.netclrMapProcessName(process.Name, names)
-		if !keep {
-			continue
-		}
-
 		ch <- prometheus.MustNewConstMetric(
 			c.NumberLinkTimeChecks,
 			prometheus.CounterValue,
 			process.NumberLinkTimeChecks,
-			name,
+			process.PID,
 		)
 
 		timeinRTchecks := 0.0
-		if process.Frequency_PerfTime != 0 {
-			timeinRTchecks = process.PercentTimeinRTchecks / process.Frequency_PerfTime
+		if process.FrequencyPerfTime != 0 {
+			timeinRTchecks = process.PercentTimeinRTchecks / process.FrequencyPerfTime
 		}
 		ch <- prometheus.MustNewConstMetric(
 			c.TimeinRTchecks,
 			prometheus.GaugeValue,
 			timeinRTchecks,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.StackWalkDepth,
 			prometheus.GaugeValue,
 			process.StackWalkDepth,
-			name,
+			process.PID,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
 			c.TotalRuntimeChecks,
 			prometheus.CounterValue,
 			process.TotalRuntimeChecks,
-			name,
+			process.PID,
 		)
 	}
 
